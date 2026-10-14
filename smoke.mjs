@@ -95,22 +95,23 @@ if (!hasKey) {
   const sf = await call("kma_short_forecast", { kind: "short", place: "서울 강남구" }, (b) => b.일별요약.length >= 2 && b.시간별.length >= 24 && !b.메타.경고, { label: "단기예보(완전성: 행수=전체행수)" });
   if (sf) console.log(`   단기예보 행수 ${sf.메타.행수} / 전체 ${sf.메타.전체행수}, 시간별 ${sf.시간별.length}행, 일별 ${sf.일별요약.length}일`);
   await call("kma_short_forecast", { kind: "short", lat: 35.1796, lon: 129.0756, hours: 6 }, (b) => b.시간별.length === 6, { label: "부산 좌표" });
-  await call("kma_forecast_version", { ftype: "SHRT", basedatetime: `${new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "")}0800` }, (b) => !!b.항목, { label: "예보버전(앞서 APPLICATION_ERROR)", unverifiedSpec: true });
+  await call("kma_forecast_version", { ftype: "SHRT", basedatetime: `${new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, "")}0800` }, (b) => !!b.항목?.length, { label: "예보버전(1970=발표없음)" });
 
   await call("kma_mid_forecast", { kind: "outlook", id: "108" }, (b) => typeof b.전망문 === "string" && b.전망문.length > 50);
   await call("kma_mid_forecast", { kind: "land", id: "11B00000" }, (b) => b.일별.length > 3, { label: "육상(광역코드 가정 확인)" });
   await call("kma_mid_forecast", { kind: "temp", place: "서울" }, (b) => b.일별.length > 3);
-  await call("kma_mid_forecast", { kind: "sea", id: "12A20100" }, (b) => b.일별.length > 3, { label: "해상(코드는 mid_region H에서 확인)", unverifiedSpec: true });
+  await call("kma_mid_forecast", { kind: "sea", id: "12A20000" }, (b) => b.일별.length > 3, { label: "해상(서해중부)" });
 
   await call("kma_warnings", { kind: "status" }, (b) => Array.isArray(b.항목));
   await call("kma_warnings", { kind: "warning_list", stn_id: "109" }, (b) => Array.isArray(b.항목), { label: "오늘 0건도 정상" });
-  await call("kma_warnings", { kind: "area", area_code: "L1010000", from: "20260601", to: "20260607" }, (b) => Array.isArray(b.항목), { label: "과거 기간" });
+  await call("kma_warnings", { kind: "area", area_code: "L1010000", from: new Date(Date.now() + 9 * 3600e3 - 5 * 86400e3).toISOString().slice(0, 10).replace(/-/g, "") }, (b) => Array.isArray(b.항목), { label: "최근 5일" });
+  await call("kma_warnings", { kind: "area", area_code: "L1010000", from: "20260101" }, (b, t, r) => r.isError && /60일/.test(t), { label: "60일 초과 차단" });
   await call("kma_warnings", { kind: "info", stn_id: "108" }, (b) => Array.isArray(b.항목));
 
-  await call("kma_tour_weather", { kind: "forecast", course_id: "17" }, (b) => b.항목?.length > 0, { label: "관광지 예보(파라미터 규약 검증)", unverifiedSpec: true });
-  await call("kma_tour_weather", { kind: "climate_index", city_area_id: "2726000000" }, (b) => b.항목?.length > 0, { label: "관광기후지수", unverifiedSpec: true });
+  await call("kma_tour_weather", { kind: "forecast", course_id: "17" }, (b) => b.항목?.length > 0, { label: "관광지 예보" });
+  await call("kma_tour_weather", { kind: "climate_index", city_area_id: "2726000000" }, (b) => b.항목?.length > 0, { label: "관광기후지수" });
 
-  await call("kma_road_weather", { eqmt_id: "0500C00001" }, (b) => b.항목?.length >= 0 && !!b.조건, { label: "CCTV 도로날씨", unverifiedSpec: true });
+  await call("kma_road_weather", { eqmt_id: "0500C00001" }, (b) => b.항목?.length > 0, { label: "CCTV 도로날씨" });
 
   await call("kma_living_index", { kind: "both", place: "서울 강남구" }, (b) => b.결과.length === 2 && b.결과[0].지점.length >= 1, { label: "자외선+대기정체" });
 }
