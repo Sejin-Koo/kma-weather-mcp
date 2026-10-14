@@ -16,6 +16,7 @@
 | `kma_forecast_text` | 동네예보 통보문 — 도시별 반나절 예보(날씨·강수확률·최저/최고·바람, 글피까지)·관서별 기상개황 문장·해상예보 | API허브 typ02 `VilageFcstMsgService` · `FcstZoneInfoService`(좌표) |
 | `kma_impact_forecast` | 폭염·한파 영향예보 — 특보구역·분야별 위험수준 요약·지역 수·분포도 PNG(2019년부터) | API허브 typ01 `ifs_fct_pstt` · `ifs_ilvl_zone_cnt` · `ifs_ilvl_dmap` |
 | `kma_highway_weather` | 고속도로 IC·휴게소 1,118곳 날씨실황, 출발지→도착지 출발시각 기준 지점별 도착시각 예보 | API허브 cgi-bin `nph-land_highway_weather_txt` · `nph-land_highway_shrt_txt` |
+| `kma_forecast_archive` | 과거 예보 발표분 — 단기 육상(2010~)·해상·개황 문장, 중기 육상·기온(2015~)·해상·전망 문장, 격자 단기예보(2021-07~). 예보 대상일별 발표 변화 | API허브 url `fct_afs_dl2`·`do`·`ds`·`wl`·`wc`·`wo`·`ws`, cgi-bin `nph-dfs_shrt_grd` |
 | `kma_tour_weather` | 관광코스별 관광지 예보·시군구 관광기후지수 | getTourStnVilageFcst1 · getCityTourClmIdx1 |
 | `kma_road_weather` | CCTV 영상분석 도로날씨 | getCctvStnRoadWthr · getStdNodeLinkRoadWw |
 | `kma_living_index` | 자외선·대기정체 지수 예측(시각별, 단계별 주의사항 포함) | getUVIdxV5 · getAirDiffusionIdxV5 |

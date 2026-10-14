@@ -61,7 +61,7 @@ async function call(name, args, check, { label = "", unverifiedSpec = false } = 
 }
 
 // ── 도구 목록 ────────────────────────────────────────────────────────────────
-const expected = ["kma_find_code", "kma_short_forecast", "kma_forecast_version", "kma_mid_forecast", "kma_warnings", "kma_warning_history", "kma_warning_map", "kma_forecast_text", "kma_impact_forecast", "kma_highway_weather", "kma_tour_weather", "kma_road_weather", "kma_living_index", "kma_uv_observation", "kma_api_status"];
+const expected = ["kma_find_code", "kma_short_forecast", "kma_forecast_version", "kma_mid_forecast", "kma_warnings", "kma_warning_history", "kma_warning_map", "kma_forecast_text", "kma_impact_forecast", "kma_highway_weather", "kma_forecast_archive", "kma_tour_weather", "kma_road_weather", "kma_living_index", "kma_uv_observation", "kma_api_status"];
 const tools = await client.listTools();
 const got = new Set(tools.tools.map((t) => t.name));
 const missing = expected.filter((n) => !got.has(n));
@@ -153,6 +153,13 @@ if (!hasKey) {
   await call("kma_find_code", { kind: "aws_zone", query: "강원 정선군 정선읍", tm: "202601100900" }, (b) => b.구역.특보구역코드 === "L1021010", { label: "개편 전 구역(정선군평지)" });
   await call("kma_find_code", { kind: "aws_zone", query: "강원 정선군 정선읍" }, (b) => b.구역.특보구역코드.startsWith("L102") && b.구역.특보구역코드 !== "L1021010", { label: "현재 구역" });
   await call("kma_warning_history", { kind: "events", from: "20260101", to: "20260131", wrn: "대설", place: "강원 강릉시 성산면", limit: 2 }, (b) => b.전체행수 > 0 && /AWS/.test(b.구역해석.방식), { label: "읍면동 → AWS 구역" });
+
+  // 과거 예보 발표분(API허브 fct_afs_*) — 2026-10-14 실측값
+  await call("kma_forecast_archive", { kind: "mid_temp", place: "서울", target_date: "20250805" }, (b) => b.조건.구역코드 === "11B10101" && b.발표수 === 13 && b.발표별변화.length === 13, { label: "중기기온 8/5 발표별 변화 13회" });
+  await call("kma_forecast_archive", { kind: "short_land", place: "강원 춘천시", target_date: "20250802" }, (b) => b.발표수 > 0 && b.발표별변화.length > 0, { label: "단기육상 8/2 발표별 변화" });
+  await call("kma_forecast_archive", { kind: "grid", place: "서울 중구", tmfc: "2025080105", times: "2025080115", vars: "TMP,POP" }, (b) => b.격자.nx === 60 && b.격자.ny === 127 && b.시각별[0]["기온(℃)"] === 34 && b.시각별[0]["강수확률(%)"] === 0, { label: "격자 2025-08-01 15시 34℃/0%" });
+  await call("kma_forecast_archive", { kind: "short_text", place: "서울", from: "20250801", limit: 1, max_chars: 200 }, (b, t) => b.전체건수 === 3 && !/예보관/.test(JSON.stringify(b.문서)), { label: "단기 개황 문장(예보관명 제외)" });
+  await call("kma_forecast_archive", { kind: "short_land", from: "20250801" }, (b, t) => /구역코드\(reg\)가 필요/.test(t), { label: "구역 없으면 거부" });
 
   await call("kma_tour_weather", { kind: "forecast", course_id: "17" }, (b) => b.항목?.length > 0, { label: "관광지 예보" });
   await call("kma_tour_weather", { kind: "forecast", course_id: "17", hours: 108 }, (b) => b.항목.length > 0 && !b.항목.some((r) => Number(r.sky) === 0 && Number(r.th3) === 0) && (!b.예보범위 || b.예보범위.제외행수 > 0), { label: "범위 밖 0값 행 제외" });
