@@ -108,11 +108,19 @@ if (!hasKey) {
   await call("kma_warnings", { kind: "area", area_code: "L1010000", from: new Date(Date.now() + 9 * 3600e3 - 5 * 86400e3).toISOString().slice(0, 10).replace(/-/g, "") }, (b) => Array.isArray(b.항목), { label: "최근 5일" });
   await call("kma_warnings", { kind: "area", area_code: "L1010000", from: "20260101" }, (b, t, r) => r.isError && /60일/.test(t), { label: "60일 초과 차단" });
   await call("kma_warnings", { kind: "info", stn_id: "108" }, (b) => Array.isArray(b.항목));
+  await call("kma_warnings", { kind: "warning_list", stn_id: "108", from: new Date(Date.now() + 9 * 3600e3 - 6 * 86400e3).toISOString().slice(0, 10).replace(/-/g, "") }, (b) => Array.isArray(b.항목), { label: "목록 6일 전 = 허용" });
+  await call("kma_warnings", { kind: "info_list", stn_id: "108", from: new Date(Date.now() + 9 * 3600e3 - 7 * 86400e3).toISOString().slice(0, 10).replace(/-/g, "") }, (b, t, r) => r.isError && /6일 전/.test(t) && /kind=area/.test(t) && /원천 API 호출 수: 0/.test(t), { label: "목록 7일 전 = 서버 사전 차단" });
 
   await call("kma_tour_weather", { kind: "forecast", course_id: "17" }, (b) => b.항목?.length > 0, { label: "관광지 예보" });
+  await call("kma_tour_weather", { kind: "forecast", course_id: "17", hours: 108 }, (b) => b.항목.length > 0 && !b.항목.some((r) => Number(r.sky) === 0 && Number(r.th3) === 0) && (!b.예보범위 || b.예보범위.제외행수 > 0), { label: "범위 밖 0값 행 제외" });
   await call("kma_tour_weather", { kind: "climate_index", city_area_id: "2726000000" }, (b) => b.항목?.length > 0, { label: "관광기후지수" });
 
-  await call("kma_road_weather", { eqmt_id: "0500C00001" }, (b) => b.항목?.length > 0, { label: "CCTV 도로날씨" });
+  // CCTV 지점별로 최근 결과가 없는 시간대가 있다(코드 03) — 2026-10-14 오후 0500C00001·0001C00003이 그랬다. 두 지점 중 하나라도 자료가 오면 통과
+  {
+    const r1 = await call("kma_road_weather", { eqmt_id: "0500C00001" }, (b, t) => b?.항목?.length > 0 || /코드 03/.test(t), { label: "CCTV 도로날씨(03은 지점 사정)" });
+    const r2 = await call("kma_road_weather", { eqmt_id: "2023T1" }, (b, t) => b?.항목?.length > 0 || /코드 03/.test(t), { label: "CCTV 도로날씨 양재" });
+    if (!(r1?.항목?.length || r2?.항목?.length)) { fails++; console.log("   ❌ 두 CCTV 지점 모두 자료 없음 — 서비스 상태 확인 필요"); }
+  }
 
   await call("kma_uv_observation", {}, (b) => b.지점수 >= 5 && b.관측.some((r) => r.지점 === 108 && r.지점명 === "서울"), { label: "최신 전 지점" });
   await call("kma_uv_observation", { place: "제주 서귀포시" }, (b) => b.관측소선택.선택관측소.includes("13") && b.관측[0].지점명 === "고산센터", { label: "서귀포→가장 가까운 관측소(고산)" });
