@@ -1,0 +1,15 @@
+{
+  "name": "kma-weather-mcp",
+  "version": "1.0.0",
+  "description": "기상청 날씨 MCP 서버 — 단기예보·중기예보·기상특보·관광코스 날씨·CCTV 도로날씨·생활기상지수를 공공데이터포털 경유로 실시간 조회",
+  "type": "module",
+  "scripts": {
+    "test": "node smoke.mjs"
+  },
+  "keywords": ["mcp", "kma", "weather", "forecast", "warning"],
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  }
+}
