@@ -61,7 +61,7 @@ async function call(name, args, check, { label = "", unverifiedSpec = false } = 
 }
 
 // ── 도구 목록 ────────────────────────────────────────────────────────────────
-const expected = ["kma_find_code", "kma_short_forecast", "kma_forecast_version", "kma_mid_forecast", "kma_warnings", "kma_warning_history", "kma_warning_map", "kma_tour_weather", "kma_road_weather", "kma_living_index", "kma_uv_observation", "kma_api_status"];
+const expected = ["kma_find_code", "kma_short_forecast", "kma_forecast_version", "kma_mid_forecast", "kma_warnings", "kma_warning_history", "kma_warning_map", "kma_forecast_text", "kma_impact_forecast", "kma_highway_weather", "kma_tour_weather", "kma_road_weather", "kma_living_index", "kma_uv_observation", "kma_api_status"];
 const tools = await client.listTools();
 const got = new Set(tools.tools.map((t) => t.name));
 const missing = expected.filter((n) => !got.has(n));
@@ -80,6 +80,11 @@ await call("kma_find_code", { kind: "tour_city", query: "수성" }, (b) => b.결
 await call("kma_find_code", { kind: "cctv", query: "경부 양재" }, (b) => b.전체일치 >= 1);
 await call("kma_find_code", { kind: "location", query: "광주 북구" }, (b) => b.결과[0].중기예보구역_추정.중기기온.구역코드 === "11F20501" && b.결과[0].특보구역_추정.every((w) => w.특보구역코드 !== "L1013400"), { label: "전남광주통합 → 광주광역시 구역(경기 광주 아님)" });
 await call("kma_find_code", { kind: "cctv_routes" }, (b) => b.노선별.length > 5);
+await call("kma_find_code", { kind: "location", query: "광주광역시" }, (b) => b.결과[0].지역 === "전남광주통합특별시 서구", { label: "옛 광주광역시 → 서구(무안 좌표 아님)" });
+await call("kma_find_code", { kind: "fcst_text_region", query: "춘천" }, (b) => b.결과.some((r) => r.코드 === "11D10301"));
+await call("kma_find_code", { kind: "highway", query: "경부 기흥" }, (b) => b.결과.some((r) => r.지점 === "기흥IC" && r.노선코드 === "01" && r.실황지점코드 === "010137"));
+await call("kma_find_code", { kind: "highway_route" }, (b) => b.노선.length === 17 && b.노선.every((x) => x.방향.length === 2));
+await call("kma_forecast_text", { kind: "land", reg_id: "11D10000" }, (b, t, r) => r.isError && /도시\(C\)/.test(t), { label: "광역 코드 → 도시 코드 안내" });
 await call("kma_short_forecast", { kind: "short" }, (b, t, r) => r.isError && /위치가 필요/.test(t), { label: "위치 없음 → 안내" });
 await call("kma_short_forecast", { kind: "short", nx: 999, ny: 1 }, (b, t, r) => r.isError && /격자 범위/.test(t), { label: "격자 범위 오류" });
 await call("kma_living_index", { kind: "uv" }, (b, t, r) => r.isError && /지원하지 않습니다/.test(t), { label: "지점 없는 일괄조회 차단" });
@@ -127,6 +132,28 @@ if (!hasKey) {
     if (!okImg) fails++;
     console.log(`${okImg ? "✅" : "❌"} kma_warning_map 특보 이미지 (${img ? img.data.length : 0} b64)`);
   }
+  // API허브: 통보문·영향예보·고속도로·과거 초단기·AWS 구역(2026-10-14 추가)
+  await call("kma_forecast_text", { kind: "land", place: "춘천" }, (b) => b.구역.구역코드 === "11D10301" && b.예보.length >= 6 && b.예보.some((x) => x.최저기온 !== undefined), { label: "도시 반나절 예보" });
+  await call("kma_forecast_text", { kind: "land", place: "서울 강남구" }, (b) => b.구역.구역코드 === "11B10101" && b.구역해석.추정, { label: "좌표 최근접 도시 구역" });
+  await call("kma_forecast_text", { kind: "situation", place: "강원 강릉" }, (b) => b.관서.includes("105") && b.기상개황.length > 30, { label: "기상개황(강원)" });
+  await call("kma_forecast_text", { kind: "sea", place: "서해중부앞바다" }, (b) => b.예보.length >= 4 && !!b.예보[0].파고, { label: "해상" });
+  await call("kma_impact_forecast", { kind: "status", from: "20250801", to: "20250802", ifpar: "hw", lat: 35.87, lon: 128.6 }, (b) => b.위험수준요약.some((x) => x.위험수준 === "위험") && b.조건.구역.includes("L1070100"), { label: "2025-08 대구 폭염 위험(옛 구역코드)" });
+  await call("kma_impact_forecast", { kind: "counts", from: "20250801", to: "20250801", ifpar: "hw", limit: 3 }, (b) => b.전체행수 > 0 && b.목록[0].지역수 > 0);
+  {
+    const r = await client.callTool({ name: "kma_impact_forecast", arguments: { kind: "map", tmfc: "20250801", ifpar: "hw" } });
+    const img = r.content.find((x) => x.type === "image");
+    count++;
+    const okImg = !r.isError && img && img.mimeType === "image/png" && img.data.length > 100000;
+    if (!okImg) fails++;
+    console.log(`${okImg ? "✅" : "❌"} kma_impact_forecast 분포도(Content-Type 오표기 PNG) (${img ? img.data.length : 0} b64)`);
+  }
+  await call("kma_highway_weather", { kind: "now", point: "기흥IC" }, (b) => b.실황.length >= 1 && typeof b.실황[0].기온 === "number", { label: "고속도로 실황" });
+  await call("kma_highway_weather", { kind: "trip", from: "양재IC", to: "구서IC" }, (b) => b.경로.노선코드 === "02" && b.지점별.length === 88, { label: "서울→부산 = 경부선 하행 88지점" });
+  await call("kma_short_forecast", { kind: "ultra", place: "서울 중구", base_date: "20240101", base_time: "1130" }, (b) => b.시간별.length === 6 && b.발표시각 === "2024-01-01 11:00", { label: "과거 초단기예보(지점 조회)" });
+  await call("kma_find_code", { kind: "aws_zone", query: "강원 정선군 정선읍", tm: "202601100900" }, (b) => b.구역.특보구역코드 === "L1021010", { label: "개편 전 구역(정선군평지)" });
+  await call("kma_find_code", { kind: "aws_zone", query: "강원 정선군 정선읍" }, (b) => b.구역.특보구역코드.startsWith("L102") && b.구역.특보구역코드 !== "L1021010", { label: "현재 구역" });
+  await call("kma_warning_history", { kind: "events", from: "20260101", to: "20260131", wrn: "대설", place: "강원 강릉시 성산면", limit: 2 }, (b) => b.전체행수 > 0 && /AWS/.test(b.구역해석.방식), { label: "읍면동 → AWS 구역" });
+
   await call("kma_tour_weather", { kind: "forecast", course_id: "17" }, (b) => b.항목?.length > 0, { label: "관광지 예보" });
   await call("kma_tour_weather", { kind: "forecast", course_id: "17", hours: 108 }, (b) => b.항목.length > 0 && !b.항목.some((r) => Number(r.sky) === 0 && Number(r.th3) === 0) && (!b.예보범위 || b.예보범위.제외행수 > 0), { label: "범위 밖 0값 행 제외" });
   await call("kma_tour_weather", { kind: "climate_index", city_area_id: "2726000000" }, (b) => b.항목?.length > 0, { label: "관광기후지수" });

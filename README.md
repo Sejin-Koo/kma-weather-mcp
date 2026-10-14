@@ -7,12 +7,15 @@
 | 도구 | 하는 일 | 원천 오퍼레이션 |
 |---|---|---|
 | `kma_find_code` | 지역명·좌표 → 격자(nx,ny)·행정구역코드·특보구역·중기구역, 관광코스·시군구·CCTV 검색(원천 호출 없음). `station`·`uv_station`: 지상관측소·자외선 관측소 검색, 가까운 관측소, 관측소별 예보구역코드 | 내장 코드표 · API허브 `stn_inf.php` |
-| `kma_short_forecast` | 동네예보 — 초단기실황·초단기예보·단기예보(시간별+일별 요약) | getUltraSrtNcst · getUltraSrtFcst · getVilageFcst |
+| `kma_short_forecast` | 동네예보 — 초단기실황·초단기예보·단기예보(시간별+일별 요약). 과거 초단기예보(어제보다 앞 발표분)는 API허브 지점 조회로 자동 전환 | getUltraSrtNcst · getUltraSrtFcst · getVilageFcst · API허브 `nph-land_fct_shrt_txt` |
 | `kma_forecast_version` | 동네예보 발표 버전 | getFcstVersion |
 | `kma_mid_forecast` | 중기예보 — 전망·육상·기온·해상 | getMidFcst · getMidLandFcst · getMidTa · getMidSeaFcst |
 | `kma_warnings` | 기상특보·예비특보·기상정보·기상속보·구역별 발효 특보·현황 | getPwnStatus · getPwnCd · getWthrWrnList/Msg · getWthrPwnList/Pwn · getWthrInfoList/Info · getWthrBrkNewsList/BrkNews |
 | `kma_warning_history` | 특보 발표·해제 이력(기간 지정, 2015년 자료도), 과거 시각 특보현황, 기상정보·날씨해설 문서 | API허브 typ01 `wrn_met_data`·`wrn_now_data_new`·`wrn_inf_rpt`·`wthr_cmt_rpt`·`wrn_reg` |
 | `kma_warning_map` | 특보 발표·발효 현황 지도(PNG, 과거 시각 가능) | API허브 typ03 `nph-wrn7` |
+| `kma_forecast_text` | 동네예보 통보문 — 도시별 반나절 예보(날씨·강수확률·최저/최고·바람, 글피까지)·관서별 기상개황 문장·해상예보 | API허브 typ02 `VilageFcstMsgService` · `FcstZoneInfoService`(좌표) |
+| `kma_impact_forecast` | 폭염·한파 영향예보 — 특보구역·분야별 위험수준 요약·지역 수·분포도 PNG(2019년부터) | API허브 typ01 `ifs_fct_pstt` · `ifs_ilvl_zone_cnt` · `ifs_ilvl_dmap` |
+| `kma_highway_weather` | 고속도로 IC·휴게소 1,118곳 날씨실황, 출발지→도착지 출발시각 기준 지점별 도착시각 예보 | API허브 cgi-bin `nph-land_highway_weather_txt` · `nph-land_highway_shrt_txt` |
 | `kma_tour_weather` | 관광코스별 관광지 예보·시군구 관광기후지수 | getTourStnVilageFcst1 · getCityTourClmIdx1 |
 | `kma_road_weather` | CCTV 영상분석 도로날씨 | getCctvStnRoadWthr · getStdNodeLinkRoadWw |
 | `kma_living_index` | 자외선·대기정체 지수 예측(시각별, 단계별 주의사항 포함) | getUVIdxV5 · getAirDiffusionIdxV5 |
@@ -26,7 +29,7 @@
 | `DATA_PORTAL_KEY` | 필수 | 공공데이터포털 인증키(여러 서버 공용). 6개 서비스 모두 활용신청·승인되어 있어야 합니다 |
 | `MCP_GATE_KEYS` | 권장 | 접근 허용 키 목록(쉼표). 비어 있으면 게이트 비활성 |
 | `MCP_GATE_MODE` | 권장 | `enforce`면 키 없는 호출을 401로 막습니다 |
-| `KMA_APIHUB_KEY` | 권장 | 기상청 API허브(apihub.kma.go.kr) 인증키. 있으면 단기·중기예보를 허브 우선으로 조회 |
+| `KMA_APIHUB_KEY` | 권장 | 기상청 API허브(apihub.kma.go.kr) 인증키. 단기·중기예보 허브 우선 조회, 그리고 통보문·영향예보·고속도로·특보 이력/지도·자외선 관측·관측소 정보 등 허브 전용 도구에 필요 |
 | `KMA_HUB_SERVICES` | 선택 | 허브 우선 서비스 목록(기본 `SHORT,MID`) |
 | `KMA_HOST_SHORT` 등 | 선택 | `apihub`(허브만) 또는 `datago`(포털만)로 서비스별 강제 지정(`SHORT`·`MID`·`WARN`·`TOUR`·`ROAD`·`LIVING`) |
 
@@ -54,11 +57,19 @@
 - 지점정보의 `tm`은 반영된다(지상 2022-11 96곳 → 현재 97곳, 자외선 2015-01 6곳 → 현재 15곳). 지상관측소의 예보구역코드(FCT_ID)는 중기기온 도시 코드 체계이고, `kma_mid_forecast(place=…)`는 행정구역 이름으로 구역을 못 찾을 때 가장 가까운 지상관측소의 배정 구역으로 보완한다(그 관측소의 배정이지 조회 지역의 배정은 아니므로 거리를 함께 표시).
 - 기상청 격자 파일(20260701)은 전라남도·광주광역시를 `전남광주통합특별시`로 묶었지만 중기·특보 구역표는 옛 시도 체계다 → 구역 추정은 옛 시도명(광주 5개 구는 광주광역시)으로 되돌려 한다. 같은 이름의 구역(광주·고성 등)은 시도 기준으로 가른다.
 - 자외선 관측(`kma_sfctm_uv.php`)은 JSON이 아니라 EUC-KR 고정폭 텍스트입니다. `tm`을 비우면 정시 자료가 와서, 서버는 '지금-10분'부터 10분씩 거슬러 최신 10분 자료를 찾습니다. 지점명·좌표는 지점정보 API(`stn_inf.php?inf=UV`, 12시간 캐시)에서 받고, 지역명·좌표를 주면 가장 가까운 관측소를 거리와 함께 고릅니다. 관측소는 전국 십수 곳뿐입니다.
+- **API허브 추가분(2026-10-14 실측)**
+  - 동네예보 통보문 육상예보는 도시(C) 코드에서만 자료가 나온다(광역 A·국지 B는 코드 03). 예보구역정보(`getFcstZoneCd`)의 `totalCount`는 요청한 `numOfRows`만큼 찍혀 실제 전체가 아니다 → 한 번에 2000건 요청(실제 755).
+  - AWS-특보구역 매칭은 **v2(`wrn_reg_aws2`)만** 쓴다. v1은 지금 시각으로도 개편 전 구역이 남아 있다(163개 중 현재 113개). v2는 `tm`을 반영해 과거 시점 구역을 준다 → 특보 이력·영향예보를 좌표로 맞출 때 기간 시작·끝 시점 구역을 함께 넣는다.
+  - 영향예보 분포도는 PNG인데 `Content-Type: text/plain`으로 온다 → 매직 바이트로 판정. `ifpar=hw`로 불러도 명세에 없는 요소 `HO` 행이 섞여 온 적이 있다(2025-08-05 9행) → 요청 요소만 남기고 알린다.
+  - 고속도로 노선코드는 방향별(상·하행). 예보 출발시각은 지금부터 3시간 뒤까지. **대형차(car=02) 도착시각이 승용차보다 빠르게 나왔다**(양재→구서 승용 19:50·대형 19:04, 가이드는 대형 80km/h) → 경고를 붙인다.
+  - 지점 단기예보(`nph-land_fct_shrt_txt`)는 초단기예보와 값이 같다(서울 중구 6시간 일치). 2021년 발표분도 나오고, 발효는 발표+6시간까지만, 과거분 강수확률·적설은 nan.
+  - cgi-bin 계열은 오류를 HTTP 200 + `<Error>` 본문으로 준다.
+- 옛 광주광역시 질의("광주광역시", "전남 광주")는 격자 파일의 `전남광주통합특별시` 1단계 행(좌표 = 무안)으로 풀리던 것을 5개 구로 좁히고 서구를 대표로 고른다.
 - 관광코스 명세서는 요청·응답 표가 이미지로 빠져 있으나, 공개 규약대로 보낸 파라미터(`CURRENT_DATE`·`HOUR`·`COURSE_ID` / `CURRENT_DATE`·`DAY`·`CITY_AREA_ID`)가 2026-10-14 실호출로 통했습니다. 응답 필드는 원본 그대로 돌려줍니다.
 
 ## 내장 코드표 (`data/`)
 
-기상청 격자 최종 업데이트 파일(20260701) 3,838행, 특보구역코드 413, 중기예보 구역 240, 관광코스·관광지(2,785), 도로날씨 CCTV 861. `scripts/gen-data.py`로 원천 파일에서 생성합니다. 기상청이 코드표를 갱신하면 다시 생성해 교체합니다.
+기상청 격자 최종 업데이트 파일(20260701) 3,838행, 특보구역코드 413, 중기예보 구역 240, 관광코스·관광지(2,785), 도로날씨 CCTV 861, 동네예보 통보문 구역코드 362, 고속도로 지점 1,118(34개 노선·방향, `scripts/gen-data2.py`). `scripts/gen-data.py`로 원천 파일에서 생성합니다. 기상청이 코드표를 갱신하면 다시 생성해 교체합니다.
 
 ## 개발
 
