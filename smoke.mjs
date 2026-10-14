@@ -78,6 +78,7 @@ await call("kma_find_code", { kind: "mid_region", query: "서울" }, (b) => b.�
 await call("kma_find_code", { kind: "tour_course", query: "17" }, (b) => b.관광지상세?.length >= 3);
 await call("kma_find_code", { kind: "tour_city", query: "수성" }, (b) => b.결과[0].시군구ID === "2726000000");
 await call("kma_find_code", { kind: "cctv", query: "경부 양재" }, (b) => b.전체일치 >= 1);
+await call("kma_find_code", { kind: "location", query: "광주 북구" }, (b) => b.결과[0].중기예보구역_추정.중기기온.구역코드 === "11F20501" && b.결과[0].특보구역_추정.every((w) => w.특보구역코드 !== "L1013400"), { label: "전남광주통합 → 광주광역시 구역(경기 광주 아님)" });
 await call("kma_find_code", { kind: "cctv_routes" }, (b) => b.노선별.length > 5);
 await call("kma_short_forecast", { kind: "short" }, (b, t, r) => r.isError && /위치가 필요/.test(t), { label: "위치 없음 → 안내" });
 await call("kma_short_forecast", { kind: "short", nx: 999, ny: 1 }, (b, t, r) => r.isError && /격자 범위/.test(t), { label: "격자 범위 오류" });
@@ -117,6 +118,15 @@ if (!hasKey) {
   await call("kma_uv_observation", { place: "제주 서귀포시" }, (b) => b.관측소선택.선택관측소.includes("13") && b.관측[0].지점명 === "고산센터", { label: "서귀포→가장 가까운 관측소(고산)" });
   await call("kma_uv_observation", { stn: "108", hours: 3 }, (b) => b.추이.length === 3, { label: "서울 3시간 추이" });
   await call("kma_uv_observation", { tm: "202203211500", stn: "108" }, (b) => b.관측[0].자외선지수 === 1.6, { label: "과거 시각(2022-03-21 15:00 서울=1.6)" });
+  // 지상관측소 지점정보(stn_inf SFC)
+  await call("kma_find_code", { kind: "station", query: "정선" }, (b) => b.결과[0].지점 === 217 && b.결과[0].영문명 === "Jeongseon Gun" && b.결과[0].예보구역코드 === "11D10502" && b.전체지점수 >= 90, { label: "영문명 공백 지점 파싱" });
+  await call("kma_find_code", { kind: "station", query: "100" }, (b) => b.결과[0].지점명 === "대관령" && b.결과[0].육상예보구역.구역코드 === "11D20000", { label: "예보구역→육상 광역" });
+  await call("kma_find_code", { kind: "station", query: "강원 정선군", near: true }, (b) => b.가까운관측소[0].지점 === 217 && b.가까운관측소[0].거리km < 15, { label: "지역명→가까운 관측소" });
+  await call("kma_find_code", { kind: "station", query: "북부산", tm: "202211300900" }, (b) => b.전체일치 === 0 && b.전체지점수 < 97, { label: "과거 구성(2022-11: 북부산 없음)" });
+  await call("kma_find_code", { kind: "uv_station", tm: "201501010900" }, (b) => b.전체지점수 === 6, { label: "UV 2015 구성 6곳" });
+  await call("kma_mid_forecast", { kind: "temp", place: "경북 울릉군" }, (b) => /지상관측소/.test(b.구역해석.근거) && !!b.구역해석.구역.구역코드 && b.일별.length > 3, { label: "이름 미일치→관측소 배정 보완" });
+  await call("kma_mid_forecast", { kind: "temp", place: "광주 북구" }, (b) => b.구역해석.구역.구역코드 === "11F20501", { label: "전남광주통합·동명 구역(광주광역시)" });
+  await call("kma_mid_forecast", { kind: "land", place: "강원 평창군" }, (b) => b.구역해석.구역.구역코드 === "11D10000" && !!b.구역해석.참고_가까운지상관측소, { label: "육상 + 관측소 대조" });
   await call("kma_living_index", { kind: "both", place: "서울 강남구" }, (b) => b.결과.length === 2 && b.결과[0].지점.length >= 1 && !!b.자외선단계별주의사항, { label: "자외선+대기정체" });
 }
 
