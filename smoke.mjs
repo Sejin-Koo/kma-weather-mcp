@@ -113,7 +113,8 @@ if (!hasKey) {
 
   await call("kma_road_weather", { eqmt_id: "0500C00001" }, (b) => b.항목?.length > 0, { label: "CCTV 도로날씨" });
 
-  await call("kma_uv_observation", {}, (b) => b.지점수 >= 5 && b.관측.some((r) => r.지점 === 108), { label: "최신 전 지점" });
+  await call("kma_uv_observation", {}, (b) => b.지점수 >= 5 && b.관측.some((r) => r.지점 === 108 && r.지점명 === "서울"), { label: "최신 전 지점" });
+  await call("kma_uv_observation", { place: "제주 서귀포시" }, (b) => b.관측소선택.선택관측소.includes("13") && b.관측[0].지점명 === "고산센터", { label: "서귀포→가장 가까운 관측소(고산)" });
   await call("kma_uv_observation", { stn: "108", hours: 3 }, (b) => b.추이.length === 3, { label: "서울 3시간 추이" });
   await call("kma_uv_observation", { tm: "202203211500", stn: "108" }, (b) => b.관측[0].자외선지수 === 1.6, { label: "과거 시각(2022-03-21 15:00 서울=1.6)" });
   await call("kma_living_index", { kind: "both", place: "서울 강남구" }, (b) => b.결과.length === 2 && b.결과[0].지점.length >= 1 && !!b.자외선단계별주의사항, { label: "자외선+대기정체" });
