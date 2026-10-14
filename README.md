@@ -11,6 +11,8 @@
 | `kma_forecast_version` | 동네예보 발표 버전 | getFcstVersion |
 | `kma_mid_forecast` | 중기예보 — 전망·육상·기온·해상 | getMidFcst · getMidLandFcst · getMidTa · getMidSeaFcst |
 | `kma_warnings` | 기상특보·예비특보·기상정보·기상속보·구역별 발효 특보·현황 | getPwnStatus · getPwnCd · getWthrWrnList/Msg · getWthrPwnList/Pwn · getWthrInfoList/Info · getWthrBrkNewsList/BrkNews |
+| `kma_warning_history` | 특보 발표·해제 이력(기간 지정, 2015년 자료도), 과거 시각 특보현황, 기상정보·날씨해설 문서 | API허브 typ01 `wrn_met_data`·`wrn_now_data_new`·`wrn_inf_rpt`·`wthr_cmt_rpt`·`wrn_reg` |
+| `kma_warning_map` | 특보 발표·발효 현황 지도(PNG, 과거 시각 가능) | API허브 typ03 `nph-wrn7` |
 | `kma_tour_weather` | 관광코스별 관광지 예보·시군구 관광기후지수 | getTourStnVilageFcst1 · getCityTourClmIdx1 |
 | `kma_road_weather` | CCTV 영상분석 도로날씨 | getCctvStnRoadWthr · getStdNodeLinkRoadWw |
 | `kma_living_index` | 자외선·대기정체 지수 예측(시각별, 단계별 주의사항 포함) | getUVIdxV5 · getAirDiffusionIdxV5 |
@@ -39,6 +41,9 @@
 - 단기예보 `base_time`은 02·05·08·11·14·17·20·23시(+10분 이후 제공). 자료가 없으면 최대 6발표 전까지 물러서고, 물러선 경우 `메타.발표지연안내`에 어느 발표분을 썼는지 적습니다.
 - **2026-10-14 실측**: 포털 단기예보 피드에 당일 02시 발표분만 있고 05·08시 발표분이 없었습니다(전날·전전날은 8개 모두 정상, 초단기실황·초단기예보도 정상). 같은 시각 API허브에는 있었으므로 포털 피드 지연으로 보고, 허브 우선 조회로 해결했습니다(위 절). `getFcstVersion`의 version이 `19700101090000`이면 그 발표분이 없다는 뜻입니다.
 - 구역별 특보(`kind=area`, getPwnCd)는 오늘 기준 60일 전까지, 나머지 특보 목록·본문 8종(특보·예비특보·기상정보·기상속보)은 **오늘 기준 6일 전까지**만 조회됩니다(코드 99). 서버가 미리 막고 안내합니다.
+- **과거 특보 이력은 API허브(`kma_warning_history`)로 본다.** 포털 특보 서비스의 60일·6일 제한이 없다. 한 번에 종류 미지정 92일·종류 지정 366일까지(전 종류 1년 = 2.5MB·27,514행·9.5초 실측).
+- 특보구역은 2026-05-31에 개편됐다. `wrn_reg.php?tmfc=`(비움)는 폐지 구역까지 534개, `tmfc=0`은 현재 414개다. 2025년 이력의 구역코드 227개 중 54개가 현재 구역표에 없었으므로 이름은 전체 이력 표로 붙이고, 구역 필터는 상위 구역 사슬 + 같은 시도 안 같은 이름(정선 ↔ 정선평지·정선산간)으로 맞춘다.
+- 주의보→경보 격상은 `CMD 6(변경)`으로 온다(2026-01 대설경보 행이 전부 변경). '발표'만 세면 경보가 빠지므로 발효요약은 발표·대치·변경을 센다.
 - 관광코스 날씨는 예보 범위를 넘는 시각을 모든 값이 0인 행으로 돌려줍니다(하늘 0은 없는 코드). 서버가 이 행을 빼고 `예보범위`(마지막 유효시각·제외 시각)를 응답에 적습니다.
 - 중기예보는 06시·18시 발표, **최근 24시간분만** 제공합니다.
 - 결측(±900)은 null, 해상 격자는 값이 마스킹됩니다. PCP·SNO는 범주 문자열입니다.

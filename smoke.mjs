@@ -61,7 +61,7 @@ async function call(name, args, check, { label = "", unverifiedSpec = false } = 
 }
 
 // ── 도구 목록 ────────────────────────────────────────────────────────────────
-const expected = ["kma_find_code", "kma_short_forecast", "kma_forecast_version", "kma_mid_forecast", "kma_warnings", "kma_tour_weather", "kma_road_weather", "kma_living_index", "kma_uv_observation", "kma_api_status"];
+const expected = ["kma_find_code", "kma_short_forecast", "kma_forecast_version", "kma_mid_forecast", "kma_warnings", "kma_warning_history", "kma_warning_map", "kma_tour_weather", "kma_road_weather", "kma_living_index", "kma_uv_observation", "kma_api_status"];
 const tools = await client.listTools();
 const got = new Set(tools.tools.map((t) => t.name));
 const missing = expected.filter((n) => !got.has(n));
@@ -109,8 +109,24 @@ if (!hasKey) {
   await call("kma_warnings", { kind: "area", area_code: "L1010000", from: "20260101" }, (b, t, r) => r.isError && /60일/.test(t), { label: "60일 초과 차단" });
   await call("kma_warnings", { kind: "info", stn_id: "108" }, (b) => Array.isArray(b.항목));
   await call("kma_warnings", { kind: "warning_list", stn_id: "108", from: new Date(Date.now() + 9 * 3600e3 - 6 * 86400e3).toISOString().slice(0, 10).replace(/-/g, "") }, (b) => Array.isArray(b.항목), { label: "목록 6일 전 = 허용" });
-  await call("kma_warnings", { kind: "info_list", stn_id: "108", from: new Date(Date.now() + 9 * 3600e3 - 7 * 86400e3).toISOString().slice(0, 10).replace(/-/g, "") }, (b, t, r) => r.isError && /6일 전/.test(t) && /kind=area/.test(t) && /원천 API 호출 수: 0/.test(t), { label: "목록 7일 전 = 서버 사전 차단" });
+  await call("kma_warnings", { kind: "info_list", stn_id: "108", from: new Date(Date.now() + 9 * 3600e3 - 7 * 86400e3).toISOString().slice(0, 10).replace(/-/g, "") }, (b, t, r) => r.isError && /6일 전/.test(t) && /kma_warning_history/.test(t) && /원천 API 호출 수: 0/.test(t), { label: "목록 7일 전 = 서버 사전 차단" });
 
+  // API허브 특보 계열(기간 지정)
+  await call("kma_warning_history", { kind: "events", from: "20260109", to: "20260112", wrn: "대설", area_code: "L1020000", limit: 3 }, (b) => b.발효요약.some((s) => s.특보 === "대설 경보") && b.맞춘구역.some((z) => z.includes("L1025020")), { label: "2026-01 강원 대설(경보=변경 명령, 옛 북부산지 구역)" });
+  await call("kma_warning_history", { kind: "events", from: "20260101", to: "20260131", wrn: "대설", place: "강원 정선군" }, (b) => b.전체행수 > 0 && b.맞춘구역.some((z) => z.includes("정선")) && b.목록.some((r) => r.폐지), { label: "현재 정선 ↔ 옛 정선평지 구역" });
+  await call("kma_warning_history", { kind: "events", from: "20150101", to: "20150110", wrn: "강풍", limit: 1 }, (b) => b.전체행수 > 0, { label: "2015년 이력" });
+  await call("kma_warning_history", { kind: "events", from: "20250101", to: "20251231" }, (b, t, r) => r.isError && /92일/.test(t), { label: "전 종류 1년 차단" });
+  await call("kma_warning_history", { kind: "status_at", tm: "202601100600", limit: 5 }, (b) => b.기준시각 === "2026-01-10 06:00" && b.목록.length === 5 && b.종류별구역.some((g) => g.특보.startsWith("대설")), { label: "과거 시각 특보현황" });
+  await call("kma_warning_history", { kind: "info", from: "20260110", to: "20260111", stn: "105", limit: 2, max_chars: 100 }, (b) => b.문서.length === 2 && b.문서.every((d) => d.발표관서.includes("105")), { label: "기상정보 문서(강원)" });
+  await call("kma_warning_history", { kind: "commentary", stn: "108", subcd: "13", limit: 1 }, (b) => b.문서.length === 1 && b.문서[0].구분 === "중기", { label: "날씨해설(중기)" });
+  {
+    const r = await client.callTool({ name: "kma_warning_map", arguments: { place: "강원 춘천시", range: 150, tm: "202601101000", wrn: "대설" } });
+    const img = r.content.find((x) => x.type === "image");
+    count++;
+    const okImg = !r.isError && img && img.mimeType === "image/png" && img.data.length > 2000;
+    if (!okImg) fails++;
+    console.log(`${okImg ? "✅" : "❌"} kma_warning_map 특보 이미지 (${img ? img.data.length : 0} b64)`);
+  }
   await call("kma_tour_weather", { kind: "forecast", course_id: "17" }, (b) => b.항목?.length > 0, { label: "관광지 예보" });
   await call("kma_tour_weather", { kind: "forecast", course_id: "17", hours: 108 }, (b) => b.항목.length > 0 && !b.항목.some((r) => Number(r.sky) === 0 && Number(r.th3) === 0) && (!b.예보범위 || b.예보범위.제외행수 > 0), { label: "범위 밖 0값 행 제외" });
   await call("kma_tour_weather", { kind: "climate_index", city_area_id: "2726000000" }, (b) => b.항목?.length > 0, { label: "관광기후지수" });
@@ -119,7 +135,8 @@ if (!hasKey) {
   {
     const r1 = await call("kma_road_weather", { eqmt_id: "0500C00001" }, (b, t) => b?.항목?.length > 0 || /코드 03/.test(t), { label: "CCTV 도로날씨(03은 지점 사정)" });
     const r2 = await call("kma_road_weather", { eqmt_id: "2023T1" }, (b, t) => b?.항목?.length > 0 || /코드 03/.test(t), { label: "CCTV 도로날씨 양재" });
-    if (!(r1?.항목?.length || r2?.항목?.length)) { fails++; console.log("   ❌ 두 CCTV 지점 모두 자료 없음 — 서비스 상태 확인 필요"); }
+    // 2026-10-14 실측: 14:05에는 2023T1 자료가 있었고 15시대에는 두 지점 모두 코드 03 — 시간대에 따라 비는 서비스라 실패가 아니라 확인필요로 센다
+    if (!(r1?.항목?.length || r2?.항목?.length)) { unverified++; console.log("   ⚠️ 두 CCTV 지점 모두 지금은 자료 없음(코드 03) — 다른 시각에 다시 확인"); }
   }
 
   await call("kma_uv_observation", {}, (b) => b.지점수 >= 5 && b.관측.some((r) => r.지점 === 108 && r.지점명 === "서울"), { label: "최신 전 지점" });
