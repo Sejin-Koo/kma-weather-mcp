@@ -1,6 +1,6 @@
 # kma-weather-mcp
 
-기상청 OpenAPI(공공데이터포털 경유)를 MCP 도구 9개로 묶은 서버입니다. 저장소 없이 매번 실시간 조회하고, 지역명→격자·코드 변환용 코드표만 서버에 내장합니다.
+기상청 OpenAPI(공공데이터포털·기상청 API허브)를 MCP 도구로 묶은 서버입니다. 저장소 없이 매번 실시간 조회하고, 지역명→격자·코드 변환용 코드표만 서버에 내장합니다.
 
 ## 도구
 
@@ -13,7 +13,8 @@
 | `kma_warnings` | 기상특보·예비특보·기상정보·기상속보·구역별 발효 특보·현황 | getPwnStatus · getPwnCd · getWthrWrnList/Msg · getWthrPwnList/Pwn · getWthrInfoList/Info · getWthrBrkNewsList/BrkNews |
 | `kma_tour_weather` | 관광코스별 관광지 예보·시군구 관광기후지수 | getTourStnVilageFcst1 · getCityTourClmIdx1 |
 | `kma_road_weather` | CCTV 영상분석 도로날씨 | getCctvStnRoadWthr · getStdNodeLinkRoadWw |
-| `kma_living_index` | 자외선·대기정체 지수(시각별) | getUVIdxV5 · getAirDiffusionIdxV5 |
+| `kma_living_index` | 자외선·대기정체 지수 예측(시각별, 단계별 주의사항 포함) | getUVIdxV5 · getAirDiffusionIdxV5 |
+| `kma_uv_observation` | 자외선 실측(10분 간격, 최신·과거·최근 N시간 추이) | API허브 typ01 `kma_sfctm_uv.php` |
 | `kma_api_status` | 키·호스트·코드표 상태, `ping=true`면 실호출 점검 | — |
 
 ## 환경변수
@@ -43,6 +44,7 @@
 - 한 페이지 상한이 조용히 깎일 수 있어 받은 행 수를 `totalCount`와 대조하고, 모자라면 응답에 경고를 적습니다.
 - 호출 한도는 오퍼레이션별 일일 한도(공공데이터포털 개발계정 기준 오퍼레이션당 10,000회)이며 같은 키를 쓰는 다른 서버와 공유합니다(코드 22는 재시도 금지).
 - 특보·중기 구역은 행정구역 이름 일치로 **추정**한 값입니다(기상청 공식 배정표 아님).
+- 자외선 관측(`kma_sfctm_uv.php`)은 JSON이 아니라 EUC-KR 고정폭 텍스트입니다. `tm`을 비우면 정시 자료가 와서, 서버는 '지금-10분'부터 10분씩 거슬러 최신 10분 자료를 찾습니다. 지점명은 지점정보 API(`stn_inf.php`)가 미승인(403)이라 ASOS 지점번호 기준 추정이며 13번은 미확인입니다.
 - 관광코스 명세서는 요청·응답 표가 이미지로 빠져 있으나, 공개 규약대로 보낸 파라미터(`CURRENT_DATE`·`HOUR`·`COURSE_ID` / `CURRENT_DATE`·`DAY`·`CITY_AREA_ID`)가 2026-10-14 실호출로 통했습니다. 응답 필드는 원본 그대로 돌려줍니다.
 
 ## 내장 코드표 (`data/`)

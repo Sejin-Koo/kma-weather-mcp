@@ -61,7 +61,7 @@ async function call(name, args, check, { label = "", unverifiedSpec = false } = 
 }
 
 // ── 도구 목록 ────────────────────────────────────────────────────────────────
-const expected = ["kma_find_code", "kma_short_forecast", "kma_forecast_version", "kma_mid_forecast", "kma_warnings", "kma_tour_weather", "kma_road_weather", "kma_living_index", "kma_api_status"];
+const expected = ["kma_find_code", "kma_short_forecast", "kma_forecast_version", "kma_mid_forecast", "kma_warnings", "kma_tour_weather", "kma_road_weather", "kma_living_index", "kma_uv_observation", "kma_api_status"];
 const tools = await client.listTools();
 const got = new Set(tools.tools.map((t) => t.name));
 const missing = expected.filter((n) => !got.has(n));
@@ -113,7 +113,10 @@ if (!hasKey) {
 
   await call("kma_road_weather", { eqmt_id: "0500C00001" }, (b) => b.항목?.length > 0, { label: "CCTV 도로날씨" });
 
-  await call("kma_living_index", { kind: "both", place: "서울 강남구" }, (b) => b.결과.length === 2 && b.결과[0].지점.length >= 1, { label: "자외선+대기정체" });
+  await call("kma_uv_observation", {}, (b) => b.지점수 >= 5 && b.관측.some((r) => r.지점 === 108), { label: "최신 전 지점" });
+  await call("kma_uv_observation", { stn: "108", hours: 3 }, (b) => b.추이.length === 3, { label: "서울 3시간 추이" });
+  await call("kma_uv_observation", { tm: "202203211500", stn: "108" }, (b) => b.관측[0].자외선지수 === 1.6, { label: "과거 시각(2022-03-21 15:00 서울=1.6)" });
+  await call("kma_living_index", { kind: "both", place: "서울 강남구" }, (b) => b.결과.length === 2 && b.결과[0].지점.length >= 1 && !!b.자외선단계별주의사항, { label: "자외선+대기정체" });
 }
 
 console.log(`\n호출 ${count}건 — 실패 ${fails}건, 확인필요 ${unverified}건, 원천 API 호출 합계 ${totalCalls}회`);
