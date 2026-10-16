@@ -68,6 +68,16 @@ const missing = expected.filter((n) => !got.has(n));
 const extra = [...got].filter((n) => !expected.includes(n));
 console.log(`도구 ${got.size}개 — 기대 ${expected.length}개, 누락 [${missing}] 추가 [${extra}]`);
 if (missing.length || extra.length) fails++;
+{
+  // 아이콘 사용 규칙(표의 날씨 칸에만) — 아이콘을 내는 도구 설명과 서버 안내에 들어 있어야 한다
+  const iconTools = ["kma_short_forecast", "kma_mid_forecast", "kma_forecast_text", "kma_forecast_archive", "kma_highway_weather", "kma_tour_weather", "kma_road_weather"];
+  const lack = iconTools.filter((n) => !/표의 날씨 칸에만/.test(tools.tools.find((t) => t.name === n)?.description || ""));
+  const inst = client.getInstructions?.() || "";
+  const okR = !lack.length && /표의 날씨 칸에만/.test(inst);
+  count++;
+  if (!okR) fails++;
+  console.log(`${okR ? "✅" : "❌"} 아이콘 사용 규칙 — 도구 설명 ${iconTools.length - lack.length}/${iconTools.length}, 서버 안내 ${/표의 날씨 칸에만/.test(inst) ? "있음" : "없음"}${lack.length ? " 누락 " + lack : ""}`);
+}
 
 // ── 오프라인(내장 코드표) ───────────────────────────────────────────────────
 await call("kma_find_code", { kind: "location", query: "서울 강남구" }, (b) => b.결과[0].격자.nx === 61 && b.결과[0].격자.ny === 126 && b.요약.원천호출수 === 0, { label: "강남구 격자 61,126" });
