@@ -89,6 +89,25 @@ await call("kma_short_forecast", { kind: "short" }, (b, t, r) => r.isError && /�
 await call("kma_short_forecast", { kind: "short", nx: 999, ny: 1 }, (b, t, r) => r.isError && /격자 범위/.test(t), { label: "격자 범위 오류" });
 await call("kma_living_index", { kind: "uv" }, (b, t, r) => r.isError && /지원하지 않습니다/.test(t), { label: "지점 없는 일괄조회 차단" });
 
+// 날씨 아이콘(lib/icon.js) — 원천 호출 없음
+{
+  const { iconByText, iconOf } = await import("./lib/icon.js");
+  const cases = [["맑음", "☀️"], ["구름많음", "⛅"], ["흐림", "☁️"], ["흐리고 비", "🌧️"], ["구름많고 비/눈", "🌨️"], ["흐리고 눈", "❄️"], ["구름많고 한때 소나기 곳", "🌦️"], ["빗방울", "💧"], ["빗방울눈날림", "🌨️"], ["눈날림", "🌨️"], ["현상없음", null], ["없음", null]];
+  const bad = cases.filter(([t, want]) => iconByText(t) !== want);
+  const objs = [
+    [{ 강수형태: 0, 강수형태_해석: "없음", 하늘상태: 4, 하늘상태_해석: "흐림" }, "☁️"],
+    [{ 강수형태: 1, 강수형태_해석: "비", 하늘상태: 3, 하늘상태_해석: "구름많음" }, "🌧️"],
+    [{ 하늘상태_09시: "맑음", 하늘상태_15시: "흐림", 강수형태: ["없음"] }, "☁️"],
+    [{ 하늘상태_09시: "맑음", 하늘상태_15시: "흐림", 강수형태: ["없음", "비"] }, "🌧️"],
+    [{ sky: 5, th3: 18 }, "🌧️"], [{ sky: 2, th3: 18 }, null], [{ 강수형태: 0, 강수형태_해석: "없음", 기온: 20 }, null],
+  ];
+  const badO = objs.filter(([o, want]) => iconOf(o) !== want);
+  count++;
+  const okI = !bad.length && !badO.length;
+  if (!okI) fails++;
+  console.log(`${okI ? "✅" : "❌"} 날씨 아이콘 대응표 문구 ${cases.length}개·객체 ${objs.length}개${okI ? "" : " — 불일치 " + JSON.stringify([...bad, ...badO.map(([o]) => o)])}`);
+}
+
 if (!hasKey) {
   console.log("\nDATA_PORTAL_KEY가 없어 실호출 검사는 건너뜁니다.");
   await call("kma_short_forecast", { kind: "now", place: "서울" }, (b, t, r) => r.isError && /DATA_PORTAL_KEY/.test(t), { label: "키 없음 → 안내" });
@@ -153,6 +172,11 @@ if (!hasKey) {
   await call("kma_find_code", { kind: "aws_zone", query: "강원 정선군 정선읍", tm: "202601100900" }, (b) => b.구역.특보구역코드 === "L1021010", { label: "개편 전 구역(정선군평지)" });
   await call("kma_find_code", { kind: "aws_zone", query: "강원 정선군 정선읍" }, (b) => b.구역.특보구역코드.startsWith("L102") && b.구역.특보구역코드 !== "L1021010", { label: "현재 구역" });
   await call("kma_warning_history", { kind: "events", from: "20260101", to: "20260131", wrn: "대설", place: "강원 강릉시 성산면", limit: 2 }, (b) => b.전체행수 > 0 && /AWS/.test(b.구역해석.방식), { label: "읍면동 → AWS 구역" });
+
+  // 날씨 아이콘 — 날씨 필드가 있는 행마다 `아이콘`, 원래 값은 그대로
+  await call("kma_forecast_text", { kind: "land", place: "강원 춘천시" }, (b) => b.예보.length > 0 && b.예보.every((r) => typeof r.아이콘 === "string" && typeof r.날씨 === "string") && Object.keys(b.예보[0]).indexOf("아이콘") === Object.keys(b.예보[0]).indexOf("날씨") - 1, { label: "통보문 행마다 아이콘(날씨 앞)" });
+  await call("kma_forecast_archive", { kind: "short_land", place: "강원 춘천시", target_date: "20250802" }, (b) => JSON.stringify(b).includes('"아이콘":"🌦️","날씨":"구름많고 한때 소나기 곳"') || b.발표별변화.some((x) => Object.values(x.칸 || {}).some((c) => c.아이콘 === "🌦️" && /소나기/.test(c.날씨))), { label: "소나기 문구 → 🌦️" });
+  await call("kma_short_forecast", { kind: "ultra", place: "서울 중구", base_date: "20250801", base_time: "1400" }, (b) => b.시간별.every((r) => !!r.아이콘), { label: "과거 초단기 아이콘" });
 
   // 과거 예보 발표분(API허브 fct_afs_*) — 2026-10-14 실측값
   await call("kma_forecast_archive", { kind: "mid_temp", place: "서울", target_date: "20250805" }, (b) => b.조건.구역코드 === "11B10101" && b.발표수 === 13 && b.발표별변화.length === 13, { label: "중기기온 8/5 발표별 변화 13회" });
